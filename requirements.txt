@@ -11,6 +11,7 @@ networkx>=3.2.1
 # Data / numerics
 numpy>=1.26.0
 scipy>=1.12.0
+scikit-learn>=1.4.0
 
 # Notebook
 jupyter>=1.0.0
@@ -26,3 +27,6 @@ pandas>=2.2.0
 # Utilities
 tqdm>=4.66.0
 pyyaml>=6.0.1
+
+# FL baseline (optional — install separately if needed)
+# flwr>=1.8.0
