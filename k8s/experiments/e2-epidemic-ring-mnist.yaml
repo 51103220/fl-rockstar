@@ -1,0 +1,60 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: heal-e2-epidemic-ring-mnist
+  namespace: heal-repro
+  labels:
+    exp: "e2"
+    algo: "epidemic-ring"
+    task: "mnist"
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: experiment
+        image: python:3.11-slim
+        command:
+        - bash
+        - -c
+        - |
+          pip install torch torchvision datasets networkx numpy scipy \
+            matplotlib seaborn pandas tqdm pyyaml flwr gossipy --quiet
+          git clone https://github.com/51103220/fl-rockstar.git /app
+          cd /app
+          python scripts/run_experiment.py \
+            --exp e2 \
+            --algo epidemic-ring \
+            --task mnist \
+            --n-nodes 100 \
+            --n-cycles 1000 \
+            --seed 42 \
+            --data-dir /data \
+            --ckpt-dir /checkpoints/e2/epidemic-ring/mnist \
+            --results-dir /results
+        resources:
+          requests:
+            cpu: "4"
+            memory: "8Gi"
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+          readOnly: true
+        - name: checkpoints
+          mountPath: /checkpoints
+        - name: results
+          mountPath: /results
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: heal-data-pvc
+      - name: checkpoints
+        persistentVolumeClaim:
+          claimName: heal-checkpoints-pvc
+      - name: results
+        persistentVolumeClaim:
+          claimName: heal-results-pvc

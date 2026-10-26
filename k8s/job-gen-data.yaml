@@ -1,0 +1,39 @@
+# Job: pre-split MNIST + Spambase for all 100 nodes, save to PVC
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: heal-gen-data
+  namespace: heal-repro
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: gen-data
+        image: python:3.11-slim
+        command:
+        - bash
+        - -c
+        - |
+          pip install torch torchvision datasets numpy pyyaml --quiet
+          git clone https://github.com/51103220/fl-rockstar.git /app
+          cd /app && python scripts/gen_data.py \
+            --n-nodes 100 \
+            --shards-per-node 2 \
+            --seed 42 \
+            --output-dir /data
+        resources:
+          requests:
+            cpu: "4"
+            memory: "8Gi"
+          limits:
+            cpu: "8"
+            memory: "16Gi"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: heal-data-pvc

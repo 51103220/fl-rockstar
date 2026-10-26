@@ -1,0 +1,48 @@
+# Job: run PeerSim to generate event schedules for E2/E3/E4
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: heal-peersim
+  namespace: heal-repro
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: peersim
+        image: eclipse-temurin:17-jre
+        command:
+        - bash
+        - -c
+        - |
+          apt-get update -q && apt-get install -y -q git
+          git clone https://github.com/51103220/fl-rockstar.git /app
+          cd /app
+          # Download PeerSim jar
+          curl -L https://sourceforge.net/projects/peersim/files/peersim-1.0.5.zip/download \
+            -o peersim.zip && unzip -q peersim.zip
+          # Compile custom control
+          javac -cp peersim-1.0.5/peersim-1.0.5.jar \
+            peersim/HealControl.java -d peersim/classes/
+          # Run each scenario config → outputs events JSON to /data
+          for cfg in peersim/configs/e2_node_crash.cfg \
+                     peersim/configs/e3_hub_crash.cfg \
+                     peersim/configs/e4_churn.cfg; do
+            java -cp peersim-1.0.5/peersim-1.0.5.jar:peersim/classes \
+              peersim.Simulator $cfg
+          done
+        resources:
+          requests:
+            cpu: "2"
+            memory: "4Gi"
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: heal-data-pvc
