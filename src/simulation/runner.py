@@ -17,10 +17,11 @@ def run_heal_cycle(
     clients: List[HealClient],
     hubs: List[HealHub],
     n_sends: int = 2,
+    local_epochs: int = 3,
 ) -> None:
     """One complete HEAL training cycle (Algorithms 1 + 2)."""
     # Step 1 — local training
-    client_models = {c.id: c.train_local(epochs=1) for c in clients}
+    client_models = {c.id: c.train_local(epochs=local_epochs) for c in clients}
 
     # Step 2 — each client pushes to random subset of hubs
     for c in clients:
@@ -45,9 +46,10 @@ def run_heal_cycle(
 def run_ring_cycle(
     clients: List[HealClient],
     ring_graph: nx.Graph,
+    local_epochs: int = 3,
 ) -> None:
     """One cycle of static-ring DFL — Condition A baseline."""
-    local_models = {c.id: c.train_local(epochs=1) for c in clients}
+    local_models = {c.id: c.train_local(epochs=local_epochs) for c in clients}
     alive_ids = set(local_models.keys())
 
     for c in clients:
@@ -61,9 +63,9 @@ def run_ring_cycle(
         # isolated nodes: model unchanged (worst case for convergence)
 
 
-def run_gossip_cycle(clients: List[HealClient]) -> None:
+def run_gossip_cycle(clients: List[HealClient], local_epochs: int = 3) -> None:
     """One cycle of gossip learning — Condition B baseline."""
-    local_models = {c.id: c.train_local(epochs=1) for c in clients}
+    local_models = {c.id: c.train_local(epochs=local_epochs) for c in clients}
     alive = list(clients)
 
     for c in alive:
@@ -109,11 +111,11 @@ def run_simulation(
                 prev_acc = history[-1][1] if history else 0.0
                 history.append((cycle, prev_acc))
                 continue
-            run_heal_cycle(clients, hubs, n_sends=n_sends)
+            run_heal_cycle(clients, hubs, n_sends=n_sends, local_epochs=3)
         elif condition == "ring":
-            run_ring_cycle(clients, G)
+            run_ring_cycle(clients, G, local_epochs=3)
         elif condition == "gossip":
-            run_gossip_cycle(clients)
+            run_gossip_cycle(clients, local_epochs=3)
         else:
             raise ValueError(f"Unknown condition: {condition}")
 
