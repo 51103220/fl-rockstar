@@ -80,8 +80,9 @@ def run_gossip_cycle(clients: List[HealClient], local_epochs: int = 3) -> None:
 
 
 def _ckpt_path(condition: str, ckpt_dir: str) -> str:
-    os.makedirs(ckpt_dir, exist_ok=True)
-    return os.path.join(ckpt_dir, f"ckpt_{condition}.pt")
+    path = os.path.join(ckpt_dir, condition)
+    os.makedirs(path, exist_ok=True)
+    return os.path.join(path, "ckpt.pt")
 
 
 def _save_ckpt(path: str, cycle: int, history: list, nodes: list) -> None:
