@@ -17,5 +17,4 @@ build/
 # Reproduction plan (local research notes, not part of the repo)
 reproduction/
 ../reproduction/
-# Large data archives
-*.tar.gz
+checkpoints/

@@ -1,4 +1,6 @@
+import os
 import random
+import time
 from typing import Callable, Dict, List, Optional, Tuple
 
 import networkx as nx
@@ -75,6 +77,29 @@ def run_gossip_cycle(clients: List[HealClient], local_epochs: int = 3) -> None:
             c.receive_global([local_models[partner.id]])
 
 
+def _ckpt_path(condition: str, ckpt_dir: str) -> str:
+    os.makedirs(ckpt_dir, exist_ok=True)
+    return os.path.join(ckpt_dir, f"ckpt_{condition}.pt")
+
+
+def _save_ckpt(path: str, cycle: int, history: list, nodes: list) -> None:
+    torch.save({
+        "cycle": cycle,
+        "history": history,
+        "node_states": {n.id: n.get_state() for n in nodes},
+    }, path)
+
+
+def _load_ckpt(path: str, nodes: list, device: str) -> Tuple[int, list]:
+    ckpt = torch.load(path, map_location=device)
+    for n in nodes:
+        if n.id in ckpt["node_states"]:
+            n.model.load_state_dict(ckpt["node_states"][n.id])
+    print(f"  [resume] loaded checkpoint: cycle={ckpt['cycle']}, "
+          f"last_acc={ckpt['history'][-1][1]:.4f}")
+    return ckpt["cycle"], ckpt["history"]
+
+
 def run_simulation(
     condition: str,
     n_cycles: int,
@@ -86,25 +111,32 @@ def run_simulation(
     failure_schedule: Optional[Dict[int, FailureFn]] = None,
     eval_every: int = 10,
     n_sends: int = 2,
+    ckpt_dir: str = "checkpoints",
 ) -> List[Tuple[int, float]]:
     """
     condition: 'heal' | 'ring' | 'gossip'
-    failure_schedule: {cycle_number: failure_fn}
-
+    Saves a checkpoint after every eval. Resumes automatically if one exists.
     Returns list of (cycle, avg_accuracy).
     """
+    all_nodes = (clients + hubs) if condition == "heal" else clients
+    ckpt = _ckpt_path(condition, ckpt_dir)
+    start_cycle = 0
     history: List[Tuple[int, float]] = []
 
-    import time
+    if os.path.exists(ckpt):
+        start_cycle, history = _load_ckpt(ckpt, all_nodes, getattr(all_nodes[0], "device", "cpu"))
+        start_cycle += 1  # resume from next cycle
+
     t_start = time.time()
 
-    for cycle in range(n_cycles):
+    for cycle in range(start_cycle, n_cycles):
         t_cycle = time.time()
 
         if failure_schedule and cycle in failure_schedule:
             clients, hubs, hub_ids, G = failure_schedule[cycle](
                 clients, hubs, hub_ids, G
             )
+            all_nodes = (clients + hubs) if condition == "heal" else clients
 
         if condition == "heal":
             if not hubs:
@@ -121,14 +153,15 @@ def run_simulation(
 
         if cycle % eval_every == 0:
             t_eval = time.time()
-            all_nodes = (clients + hubs) if condition == "heal" else clients
             acc = evaluate_all(all_nodes, test_loader)
             elapsed = time.time() - t_start
-            eta = (elapsed / (cycle + 1)) * (n_cycles - cycle - 1)
+            cycles_done = cycle - start_cycle + 1
+            eta = (elapsed / cycles_done) * (n_cycles - cycle - 1)
             print(f"  cycle={cycle:4d} | {condition:6s} | acc={acc:.4f} | "
                   f"alive={len(all_nodes)} | "
                   f"cycle={time.time()-t_cycle:.1f}s | eval={time.time()-t_eval:.1f}s | "
                   f"eta={eta/60:.1f}m")
             history.append((cycle, acc))
+            _save_ckpt(ckpt, cycle, history, all_nodes)
 
     return history
