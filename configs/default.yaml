@@ -1,0 +1,24 @@
+n_nodes: 100
+n_hubs: 5
+n_cycles_e1: 1000
+n_cycles_e2: 1000
+n_cycles_e3: 500
+n_cycles_e4: 500
+eval_every: 10
+batch_size: 32
+lr: 0.01
+momentum: 0.9
+weight_decay: 0.01
+shards_per_node: 2        # 2 = highly non-IID; 5 = mild non-IID
+n_sends: 2                # hubs a client contacts per cycle
+crash_rate_e2: 0.20
+churn_rate_e4: 0.10
+churn_every_cycles: 50
+seeds:
+  - 42
+  - 123
+  - 256
+  - 512
+  - 999
+data_root: /data/cifar10
+results_dir: results

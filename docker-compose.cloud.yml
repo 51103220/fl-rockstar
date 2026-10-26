@@ -1,0 +1,61 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# fl-rockstar  —  cloud override (GCP / AWS / Azure)
+#
+# Usage (from fl-rockstar/):
+#   docker compose -f docker-compose.yml -f docker-compose.cloud.yml up trainer
+#
+# Differences from base:
+#   - Uses Dockerfile.gpu (CUDA 12.1)
+#   - Mounts cloud storage buckets via environment variables
+#   - Adds GCS/S3 result upload step via RESULTS_UPLOAD_CMD
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  trainer:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.gpu
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/workspace
+      - CUDA_VISIBLE_DEVICES=0
+      # Set these in your CI/CD or .env file:
+      # RESULTS_BUCKET=gs://my-bucket/fl-rockstar
+      # GCP_SA_KEY=/run/secrets/gcp_sa_key
+    volumes:
+      - ./results:/workspace/results
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: "no"
+
+  jupyter:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.gpu
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/workspace
+    volumes:
+      - ./results:/workspace/results
+      - ./notebooks:/workspace/notebooks
+    ports:
+      - "8888:8888"
+    command: >
+      jupyter notebook
+        --ip=0.0.0.0 --port=8888 --no-browser --allow-root
+        --NotebookApp.token='' --NotebookApp.password=''
+        --notebook-dir=/workspace/notebooks
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

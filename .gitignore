@@ -1,0 +1,21 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ipynb_checkpoints/
+results/*.json
+results/*.png
+results/*.csv
+/data/
+.env
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+# Reproduction plan (local research notes, not part of the repo)
+reproduction/
+../reproduction/
+# Large data archives
+*.tar.gz

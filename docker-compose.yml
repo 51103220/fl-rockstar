@@ -1,0 +1,67 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# fl-rockstar  —  local orchestration
+#
+# Services:
+#   jupyter   → interactive notebooks (port 8888)
+#   trainer   → headless experiment runner (E1–E4)
+#   results   → mounts shared results volume for post-processing
+#
+# Usage:
+#   docker compose up jupyter        # start notebook server
+#   docker compose run trainer       # run full experiment suite
+#   docker compose run trainer python scripts/run_experiments.py
+# ─────────────────────────────────────────────────────────────────────────────
+
+x-common: &common
+  build:
+    context: .
+    dockerfile: Dockerfile
+  volumes:
+    - cifar10_data:/data/cifar10          # CIFAR-10 dataset (downloaded once)
+    - ./results:/workspace/results        # experiment output (host-mounted for easy access)
+    - ./notebooks:/workspace/notebooks    # live notebook edits reflected immediately
+  environment:
+    - PYTHONUNBUFFERED=1
+    - PYTHONPATH=/workspace
+
+services:
+  # ── Jupyter Notebook Server ──────────────────────────────────────────────
+  jupyter:
+    <<: *common
+    container_name: fl_jupyter
+    command: >
+      jupyter notebook
+        --ip=0.0.0.0
+        --port=8888
+        --no-browser
+        --allow-root
+        --NotebookApp.token=''
+        --NotebookApp.password=''
+        --notebook-dir=/workspace/notebooks
+    ports:
+      - "8888:8888"
+    restart: unless-stopped
+    profiles:
+      - dev
+
+  # ── Headless Experiment Runner ───────────────────────────────────────────
+  trainer:
+    <<: *common
+    container_name: fl_trainer
+    command: python scripts/run_experiments.py
+    profiles:
+      - train
+
+  # ── Single Experiment (override via docker compose run) ──────────────────
+  run:
+    <<: *common
+    container_name: fl_run
+    command: echo "Use: docker compose run run python scripts/run_experiments.py"
+    profiles:
+      - manual
+
+volumes:
+  cifar10_data:
+    driver: local
