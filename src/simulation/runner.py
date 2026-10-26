@@ -115,6 +115,7 @@ def run_simulation(
     eval_every: int = 10,
     n_sends: int = 2,
     ckpt_dir: str = "checkpoints",
+    local_epochs: int = 3,
 ) -> List[Tuple[int, float]]:
     """
     condition: 'heal' | 'ring' | 'gossip'
@@ -146,11 +147,11 @@ def run_simulation(
                 prev_acc = history[-1][1] if history else 0.0
                 history.append((cycle, prev_acc))
                 continue
-            run_heal_cycle(clients, hubs, n_sends=n_sends, local_epochs=3)
+            run_heal_cycle(clients, hubs, n_sends=n_sends, local_epochs=local_epochs)
         elif condition == "ring":
-            run_ring_cycle(clients, G, local_epochs=3)
+            run_ring_cycle(clients, G, local_epochs=local_epochs)
         elif condition == "gossip":
-            run_gossip_cycle(clients, local_epochs=3)
+            run_gossip_cycle(clients, local_epochs=local_epochs)
         else:
             raise ValueError(f"Unknown condition: {condition}")
 

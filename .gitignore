@@ -3,9 +3,7 @@ __pycache__/
 *.pyo
 .pytest_cache/
 .ipynb_checkpoints/
-results/*.json
-results/*.png
-results/*.csv
+/results/
 /data/
 .env
 .venv/
@@ -18,3 +16,4 @@ build/
 reproduction/
 ../reproduction/
 checkpoints/
+notebooks/data/
