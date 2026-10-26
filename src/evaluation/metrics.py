@@ -22,9 +22,10 @@ def evaluate_model(
 
 
 def evaluate_all(nodes: list, test_loader: DataLoader, device: str = "cpu", sample: int = 10) -> float:
-    """Average accuracy across a random sample of nodes (default 10) for speed."""
-    import random
-    subset = random.sample(nodes, min(sample, len(nodes)))
+    """Average accuracy across nodes. Prefers HealHub nodes (global model); falls back to random sample."""
+    from src.simulation.heal_node import HealHub
+    hubs = [n for n in nodes if isinstance(n, HealHub)]
+    subset = hubs if hubs else nodes[:sample]
     accs = [evaluate_model(n.model, test_loader, getattr(n, "device", device)) for n in subset]
     return sum(accs) / len(accs) if accs else 0.0
 
