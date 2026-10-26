@@ -1,4 +1,3 @@
-import copy
 from typing import List, Optional
 
 import torch
@@ -20,7 +19,7 @@ class HealClient:
         device: str = "cpu",
     ):
         self.id = node_id
-        self.model = copy.deepcopy(model).to(device)
+        self.model = model.to(device)
         self.data_loader = data_loader
         self.alive = True
         self.device = device
@@ -29,8 +28,12 @@ class HealClient:
         )
         self.criterion = nn.CrossEntropyLoss()
 
-    def train_local(self, epochs: int = 1) -> nn.Module:
-        """Algorithm 2, Step 1: local training."""
+    def get_state(self) -> dict:
+        """Return a {key: tensor} snapshot kept on the model's device."""
+        return {k: v.clone() for k, v in self.model.state_dict().items()}
+
+    def train_local(self, epochs: int = 1) -> dict:
+        """Algorithm 2, Step 1: local training. Returns state dict (no deepcopy)."""
         self.model.train()
         for _ in range(epochs):
             for X, y in self.data_loader:
@@ -39,18 +42,15 @@ class HealClient:
                 loss = self.criterion(self.model(X), y)
                 loss.backward()
                 self.optimizer.step()
-        return copy.deepcopy(self.model)
+        return self.get_state()
 
-    def receive_global(self, hub_models: List[nn.Module]) -> None:
-        """Algorithm 2, Steps 4–5: average models received from hubs."""
-        if not hub_models:
+    def receive_global(self, hub_states: List[dict]) -> None:
+        """Algorithm 2, Steps 4–5: average state dicts received from hubs."""
+        if not hub_states:
             return
-        avg_sd = copy.deepcopy(hub_models[0].state_dict())
-        for key in avg_sd:
-            stacked = torch.stack(
-                [m.state_dict()[key].float() for m in hub_models]
-            )
-            avg_sd[key] = stacked.mean(0)
+        avg_sd = {}
+        for key in hub_states[0]:
+            avg_sd[key] = torch.stack([s[key].float() for s in hub_states]).mean(0)
         self.model.load_state_dict(avg_sd)
 
 
@@ -59,33 +59,27 @@ class HealHub(HealClient):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._client_models: List[nn.Module] = []
+        self._client_models: List[dict] = []
 
-    def receive_from_client(self, model: nn.Module) -> None:
-        """Algorithm 1, Step 1: buffer an incoming client model."""
-        self._client_models.append(copy.deepcopy(model))
+    def receive_from_client(self, state: dict) -> None:
+        """Algorithm 1, Step 1: buffer an incoming client state dict."""
+        self._client_models.append(state)
 
-    def aggregate_clients(self) -> nn.Module:
-        """Algorithm 1, Step 2: FedAvg over buffered client models."""
+    def aggregate_clients(self) -> dict:
+        """Algorithm 1, Step 2: FedAvg over buffered client state dicts."""
         if not self._client_models:
-            return copy.deepcopy(self.model)
-        avg_sd = copy.deepcopy(self._client_models[0].state_dict())
-        for key in avg_sd:
-            stacked = torch.stack(
-                [m.state_dict()[key].float() for m in self._client_models]
-            )
-            avg_sd[key] = stacked.mean(0)
+            return self.get_state()
+        avg_sd = {}
+        for key in self._client_models[0]:
+            avg_sd[key] = torch.stack([s[key].float() for s in self._client_models]).mean(0)
         self.model.load_state_dict(avg_sd)
         self._client_models.clear()
-        return copy.deepcopy(self.model)
+        return self.get_state()
 
-    def aggregate_hubs(self, other_hub_models: List[nn.Module]) -> None:
-        """Algorithm 1, Step 5: average own model with peer hub models."""
-        all_models = [self.model] + other_hub_models
-        avg_sd = copy.deepcopy(self.model.state_dict())
-        for key in avg_sd:
-            stacked = torch.stack(
-                [m.state_dict()[key].float() for m in all_models]
-            )
-            avg_sd[key] = stacked.mean(0)
+    def aggregate_hubs(self, other_hub_states: List[dict]) -> None:
+        """Algorithm 1, Step 5: average own model with peer hub state dicts."""
+        all_states = [self.get_state()] + other_hub_states
+        avg_sd = {}
+        for key in all_states[0]:
+            avg_sd[key] = torch.stack([s[key].float() for s in all_states]).mean(0)
         self.model.load_state_dict(avg_sd)

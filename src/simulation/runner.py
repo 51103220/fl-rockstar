@@ -39,7 +39,7 @@ def run_heal_cycle(
     # Step 5 — hubs broadcast to clients
     for c in clients:
         chosen = random.sample(hubs, k=min(n_sends, len(hubs)))
-        c.receive_global([hub.model for hub in chosen])
+        c.receive_global([hub.get_state() for hub in chosen])
 
 
 def run_ring_cycle(
@@ -93,7 +93,12 @@ def run_simulation(
     """
     history: List[Tuple[int, float]] = []
 
+    import time
+    t_start = time.time()
+
     for cycle in range(n_cycles):
+        t_cycle = time.time()
+
         if failure_schedule and cycle in failure_schedule:
             clients, hubs, hub_ids, G = failure_schedule[cycle](
                 clients, hubs, hub_ids, G
@@ -113,10 +118,15 @@ def run_simulation(
             raise ValueError(f"Unknown condition: {condition}")
 
         if cycle % eval_every == 0:
+            t_eval = time.time()
             all_nodes = (clients + hubs) if condition == "heal" else clients
             acc = evaluate_all(all_nodes, test_loader)
-            history.append((cycle, acc))
+            elapsed = time.time() - t_start
+            eta = (elapsed / (cycle + 1)) * (n_cycles - cycle - 1)
             print(f"  cycle={cycle:4d} | {condition:6s} | acc={acc:.4f} | "
-                  f"alive={len(all_nodes)}")
+                  f"alive={len(all_nodes)} | "
+                  f"cycle={time.time()-t_cycle:.1f}s | eval={time.time()-t_eval:.1f}s | "
+                  f"eta={eta/60:.1f}m")
+            history.append((cycle, acc))
 
     return history
