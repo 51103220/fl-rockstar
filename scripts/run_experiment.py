@@ -39,6 +39,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch
 import networkx as nx
 
+# Limit CPU threads — simulation is single-threaded; PyTorch defaults to all cores
+torch.set_num_threads(2)
+torch.set_num_interop_threads(1)
+
 from src.simulation.heal_node import HealClient, HealHub
 from src.simulation.runner import run_simulation
 from src.topology.elevator import build_elevator_topology
@@ -199,6 +203,7 @@ def run_fl(
     eval_every: int,
     ckpt_dir: str,
     local_epochs: int = 1,
+    failure_schedule: dict = None,
 ):
     """Centralised FedAvg — server averages all clients every round."""
     from src.evaluation.metrics import evaluate_model
@@ -218,8 +223,17 @@ def run_fl(
         history = ckpt["history"]
         print(f"  [resume] FL from cycle {start_cycle}")
 
+    import networkx as nx_fl
     t0 = time.time()
     for cycle in range(start_cycle, n_cycles):
+        if failure_schedule and cycle in failure_schedule:
+            clients, _, _, _ = failure_schedule[cycle](clients, [], [], nx_fl.Graph())
+            print(f"  [failure] FL cycle {cycle}: {len(clients)} clients remaining")
+
+        if not clients:
+            print(f"  [stop] all clients crashed at cycle {cycle}, ending early")
+            break
+
         # All clients train locally
         states = [c.train_local(epochs=local_epochs) for c in clients]
         # Server aggregates (equal weights)
@@ -344,6 +358,7 @@ def main():
             eval_every=args.eval_every,
             ckpt_dir=ckpt_dir,
             local_epochs=args.local_epochs,
+            failure_schedule=failure_schedule,
         )
 
     elif args.algo == "gossip":
