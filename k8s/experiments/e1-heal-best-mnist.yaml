@@ -35,8 +35,8 @@ spec:
             --n-hubs 10 \
             --n-sends 3 \
             --hub-local-epochs 0 \
-            --lr 0.001 \
-            --local-epochs 3 \
+            --lr 0.01 \
+            --local-epochs 1 \
             --n-cycles 1000 \
             --seed 42 \
             --data-dir /data \
