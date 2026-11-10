@@ -2,7 +2,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: heal-e3-epidemic-ring-spambase
-  namespace: heal-repro
+  namespace: keda
   labels:
     exp: "e3"
     algo: "epidemic-ring"
@@ -12,15 +12,19 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: artifactory-pull-secret
+        - name: dockerhub-pull-secret
       containers:
       - name: experiment
-        image: python:3.11-slim
+        image: docker-hub.common.repositories.cloud.sap/library/python:3.11-slim
         command:
         - bash
         - -c
         - |
+          apt-get update -qq && apt-get install -y -qq git
           pip install torch torchvision datasets networkx numpy scipy \
-            matplotlib seaborn pandas tqdm pyyaml flwr gossipy --quiet
+            matplotlib seaborn pandas tqdm pyyaml scikit-learn --quiet
           git clone https://github.com/51103220/fl-rockstar.git /app
           cd /app
           python scripts/run_experiment.py \
@@ -35,10 +39,10 @@ spec:
             --results-dir /results
         resources:
           requests:
-            cpu: "4"
+            cpu: "2"
             memory: "8Gi"
           limits:
-            cpu: "4"
+            cpu: "2"
             memory: "8Gi"
         volumeMounts:
         - name: data

@@ -3,26 +3,30 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: heal-gen-data
-  namespace: heal-repro
+  namespace: keda
 spec:
   backoffLimit: 3
   template:
     spec:
       restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: artifactory-pull-secret
+        - name: dockerhub-pull-secret
       containers:
       - name: gen-data
-        image: python:3.11-slim
+        image: docker-hub.common.repositories.cloud.sap/library/python:3.11-slim
         command:
         - bash
         - -c
         - |
-          pip install torch torchvision datasets numpy pyyaml --quiet
+          apt-get update -qq && apt-get install -y -qq git
+          pip install torch torchvision datasets numpy pyyaml scikit-learn --quiet
           git clone https://github.com/51103220/fl-rockstar.git /app
           cd /app && python scripts/gen_data.py \
             --n-nodes 100 \
-            --shards-per-node 2 \
+            --shards 2 \
             --seed 42 \
-            --output-dir /data
+            --data-dir /data
         resources:
           requests:
             cpu: "4"

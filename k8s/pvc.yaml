@@ -2,8 +2,9 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: heal-checkpoints-pvc
-  namespace: heal-repro
+  namespace: keda
 spec:
+  storageClassName: files
   accessModes:
     - ReadWriteMany
   resources:
@@ -14,8 +15,9 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: heal-results-pvc
-  namespace: heal-repro
+  namespace: keda
 spec:
+  storageClassName: files
   accessModes:
     - ReadWriteMany
   resources:
@@ -26,8 +28,9 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: heal-data-pvc
-  namespace: heal-repro
+  namespace: keda
 spec:
+  storageClassName: files
   accessModes:
     - ReadWriteMany
   resources:

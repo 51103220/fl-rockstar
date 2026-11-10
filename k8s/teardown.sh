@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Teardown: delete all jobs and optionally PVCs
 # Usage: bash k8s/teardown.sh [--keep-data]
-NS=heal-repro
+NS=keda
 KEEP_DATA=${1:-""}
 
 echo "=== Tearing down HEAL reproduction ==="

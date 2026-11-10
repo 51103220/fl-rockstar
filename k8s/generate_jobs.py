@@ -11,7 +11,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: heal-{exp}-{algo}-{task}
-  namespace: heal-repro
+  namespace: keda
   labels:
     exp: "{exp}"
     algo: "{algo}"
@@ -23,7 +23,7 @@ spec:
       restartPolicy: OnFailure
       containers:
       - name: experiment
-        image: python:3.11-slim
+        image: docker-hub.common.repositories.cloud.sap/library/python:3.11-slim
         command:
         - bash
         - -c

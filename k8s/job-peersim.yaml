@@ -3,15 +3,18 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: heal-peersim
-  namespace: heal-repro
+  namespace: keda
 spec:
   backoffLimit: 3
   template:
     spec:
       restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: pull-secret
+        - name: dockerhub-pull-secret
       containers:
       - name: peersim
-        image: eclipse-temurin:17-jre
+        image: docker-hub.common.repositories.cloud.sap/library/eclipse-temurin:17-jre
         command:
         - bash
         - -c
