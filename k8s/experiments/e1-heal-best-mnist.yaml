@@ -1,0 +1,67 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: heal-e1-heal-best-mnist
+  namespace: keda
+  labels:
+    exp: "e1"
+    algo: "heal-best"
+    task: "mnist"
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: artifactory-pull-secret
+        - name: dockerhub-pull-secret
+      containers:
+      - name: experiment
+        image: docker-hub.common.repositories.cloud.sap/library/python:3.11-slim
+        command:
+        - bash
+        - -c
+        - |
+          apt-get update -qq && apt-get install -y -qq git
+          pip install torch torchvision datasets networkx numpy scipy \
+            matplotlib seaborn pandas tqdm pyyaml scikit-learn --quiet
+          git clone https://github.com/51103220/fl-rockstar.git /app
+          cd /app
+          python scripts/run_experiment.py \
+            --exp e1 \
+            --algo heal \
+            --task mnist \
+            --n-nodes 100 \
+            --n-hubs 10 \
+            --n-sends 3 \
+            --hub-local-epochs 1 \
+            --n-cycles 1000 \
+            --seed 42 \
+            --data-dir /data \
+            --ckpt-dir /checkpoints/e1/heal-best/mnist \
+            --results-dir /results
+        resources:
+          requests:
+            cpu: "4"
+            memory: "20Gi"
+          limits:
+            cpu: "4"
+            memory: "20Gi"
+        volumeMounts:
+        - name: data
+          mountPath: /data
+          readOnly: true
+        - name: checkpoints
+          mountPath: /checkpoints
+        - name: results
+          mountPath: /results
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: heal-data-pvc
+      - name: checkpoints
+        persistentVolumeClaim:
+          claimName: heal-checkpoints-pvc
+      - name: results
+        persistentVolumeClaim:
+          claimName: heal-results-pvc

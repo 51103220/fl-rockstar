@@ -57,21 +57,36 @@ class HealClient:
 class HealHub(HealClient):
     """HEAL Algorithm 1 — hub node (aggregator)."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, hub_local_epochs: int = 0, **kwargs):
         super().__init__(*args, **kwargs)
         self._client_models: List[dict] = []
+        # hub_local_epochs > 0 enables Imp. 1: hub trains on its own data
+        # before aggregating, so its own gradient is included in the FedAvg.
+        self.hub_local_epochs = hub_local_epochs
 
     def receive_from_client(self, state: dict) -> None:
         """Algorithm 1, Step 1: buffer an incoming client state dict."""
         self._client_models.append(state)
 
     def aggregate_clients(self) -> dict:
-        """Algorithm 1, Step 2: FedAvg over buffered client state dicts."""
-        if not self._client_models:
+        """Algorithm 1, Step 2: FedAvg over buffered client state dicts.
+
+        Imp. 1: when hub_local_epochs > 0, the hub first trains locally and
+        includes its own updated state in the average alongside the clients,
+        biasing aggregation toward a wider class distribution.
+        """
+        all_models = list(self._client_models)
+
+        if self.hub_local_epochs > 0:
+            hub_state = self.train_local(epochs=self.hub_local_epochs)
+            all_models.append(hub_state)
+
+        if not all_models:
             return self.get_state()
+
         avg_sd = {}
-        for key in self._client_models[0]:
-            avg_sd[key] = torch.stack([s[key].float() for s in self._client_models]).mean(0)
+        for key in all_models[0]:
+            avg_sd[key] = torch.stack([s[key].float() for s in all_models]).mean(0)
         self.model.load_state_dict(avg_sd)
         self._client_models.clear()
         return self.get_state()

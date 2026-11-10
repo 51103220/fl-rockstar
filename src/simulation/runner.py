@@ -23,7 +23,11 @@ def run_heal_cycle(
     n_sends: int = 2,
     local_epochs: int = 3,
 ) -> None:
-    """One complete HEAL training cycle (Algorithms 1 + 2)."""
+    """One complete HEAL training cycle (Algorithms 1 + 2).
+
+    Hub local training (Imp. 1) is controlled per-hub via hub.hub_local_epochs,
+    set at construction time — no extra parameter needed here.
+    """
     # Step 1 — local training
     client_models = {c.id: c.train_local(epochs=local_epochs) for c in clients}
 

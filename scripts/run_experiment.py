@@ -58,7 +58,9 @@ def parse_args():
     p.add_argument("--n-nodes",  type=int, default=100)
     p.add_argument("--n-hubs",   type=int, default=5)
     p.add_argument("--n-cycles", type=int, default=1000)
-    p.add_argument("--n-sends",  type=int, default=2,  help="Hubs each client contacts")
+    p.add_argument("--n-sends",  type=int, default=2,  help="Hubs each client contacts (Imp. 2: use 3)")
+    p.add_argument("--hub-local-epochs", type=int, default=0,
+                   help="Epochs hubs train on own data before FedAvg (Imp. 1: use 1; 0=disabled)")
     p.add_argument("--eval-every", type=int, default=10)
     p.add_argument("--shards",   type=int, default=2,  help="Shards per node (non-IID level)")
     p.add_argument("--lr",       type=float, default=0.01)
@@ -107,13 +109,14 @@ def make_model(task: str):
 
 # ─────────────────────────── topology / node setup ───────────────────────────
 
-def build_nodes(n_nodes, n_hubs, node_loaders, task, lr, device):
+def build_nodes(n_nodes, n_hubs, node_loaders, task, lr, device, hub_local_epochs=0):
     model_fn = lambda: make_model(task)
 
     # First n_hubs node IDs are hubs
     hub_ids = list(range(n_hubs))
     hubs = [
-        HealHub(i, model_fn(), node_loaders[i], lr=lr, device=device)
+        HealHub(i, model_fn(), node_loaders[i], lr=lr, device=device,
+                hub_local_epochs=hub_local_epochs)
         for i in hub_ids
     ]
     clients = [
@@ -158,6 +161,7 @@ def make_failure_schedule(exp: str, n_nodes: int, n_hubs: int, seed: int):
         def crash_all_hubs(clients, hubs, hub_ids, G):
             # Elect new hubs from surviving clients (lowest-id first)
             n_new_hubs = len(hubs)
+            hub_le = hubs[0].hub_local_epochs if hubs else 0
             new_hubs = []
             remaining_clients = list(clients)
             for c in remaining_clients[:n_new_hubs]:
@@ -165,6 +169,7 @@ def make_failure_schedule(exp: str, n_nodes: int, n_hubs: int, seed: int):
                     c.id, c.model, c.data_loader,
                     lr=c.optimizer.param_groups[0]["lr"],
                     device=c.device,
+                    hub_local_epochs=hub_le,
                 )
                 new_hubs.append(hub)
             new_clients = remaining_clients[n_new_hubs:]
@@ -316,7 +321,8 @@ def main():
     # ── nodes ─────────────────────────────────────────────────────────────────
     print("Building nodes...")
     clients, hubs, hub_ids = build_nodes(
-        args.n_nodes, args.n_hubs, node_loaders, args.task, args.lr, device
+        args.n_nodes, args.n_hubs, node_loaders, args.task, args.lr, device,
+        hub_local_epochs=args.hub_local_epochs,
     )
 
     # ── topology ──────────────────────────────────────────────────────────────
@@ -404,6 +410,8 @@ def main():
         "exp": args.exp, "algo": args.algo, "task": args.task,
         "n_nodes": args.n_nodes, "n_hubs": args.n_hubs,
         "n_cycles": args.n_cycles, "seed": args.seed,
+        "n_sends": args.n_sends,
+        "hub_local_epochs": args.hub_local_epochs,
         "history": history,
         "final_acc": history[-1][1] if history else 0.0,
         "runtime_min": total / 60,
